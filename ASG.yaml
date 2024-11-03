@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates a robust, secure, and scalable hosting environment
+
+Resources:
+  # Security Group for Auto Scaling and Launch Template
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Enable SSH And HTTP
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # Allow all IPs for SSH
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0  # Allow all IPs for HTTP
+
+  # Launch Template
+  MyLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: ami-054a53dca63de757b  # Replace with your preferred AMI
+        InstanceType: t2.micro
+        KeyName: Uppgift2  # Replace with your KeyPair
+        SecurityGroupIds:
+          - !GetAtt MySecurityGroup.GroupId
+        UserData: 
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # Update and install required packages
+            sudo dnf install -y wget php-mysqlnd httpd php-fpm php-mysqli mariadb105-server php-json php php-devel
+            
+            # Start Apache
+            sudo systemctl start httpd
+            
+            # Install php-gd for image handling
+            sudo dnf install -y php-gd
+            
+            # Set file permissions for Apache
+            sudo chown -R apache /var/www
+            sudo chgrp -R apache /var/www
+            sudo chmod 2775 /var/www
+            find /var/www -type d -exec sudo chmod 2775 {} \;
+            find /var/www -type f -exec sudo chmod 0644 {} \; 
+            echo "<?php phpinfo(); ?>" > /var/www/html/phpinfo.php
+
+            # Enable httpd at startup
+            sudo systemctl enable httpd
+
+            # Install amazon-efs-utils
+            sudo yum install -y amazon-efs-utils
+            
+      TagSpecifications:
+        - ResourceType: launch-template  # Adding a name tag to the launch template itself
+          Tags:
+            - Key: "Name"
+              Value: "MyLaunchTemplate"  # Name for the launch template
+
+  # Load Balancer
+  MyLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: my-load-balancer
+      Subnets:
+        - subnet-0bbe3cecfcee8a8df  # Replace with your subnet IDs
+        - subnet-039c2961cca321fa4
+        - subnet-0af236568601d1bd6
+      SecurityGroups:
+        - !GetAtt MySecurityGroup.GroupId
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+
+  # Target Group
+  MyTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: MyTargetGroup
+      Protocol: HTTP
+      Port: 80
+      VpcId: vpc-0b572eb8f3b48e879  # Replace with your VPC ID
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+
+  # Auto Scaling Group
+  MyASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - subnet-0bbe3cecfcee8a8df
+        - subnet-039c2961cca321fa4
+        - subnet-0af236568601d1bd6
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MyLaunchTemplate
+        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
+      MaxSize: '3'
+      MinSize: '1'
+      DesiredCapacity: '2'
+      TargetGroupARNs:
+        - !Ref MyTargetGroup
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${AWS::StackName}-Instance"
+          PropagateAtLaunch: true
+        - Key: "Environment"
+          Value: "Development"
+          PropagateAtLaunch: true
+
+  # Listener for Load Balancer
+  MyListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyTargetGroup
+      LoadBalancerArn: !Ref MyLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS name for the load balancer
+    Value: !GetAtt MyLoadBalancer.DNSName

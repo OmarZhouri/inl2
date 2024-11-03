@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template to create a MariaDB database with a security group in the default VPC'
+
+# Define the default VPC
+Parameters:
+  DefaultVPC:
+    Type: AWS::EC2::VPC::Id
+    Description: "The default VPC for MariaDB security group"
+
+Resources:
+  # Security Group for MariaDB
+  MariaDBSEGRP:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Allow MariaDB
+      VpcId: !Ref DefaultVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0  # Allows access from anywhere
+
+  # MariaDB Database Instance
+  MariaDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: db.t4g.micro   # Free tier eligible instance class
+      AllocatedStorage: 20
+      Engine: MariaDB
+      EngineVersion: 10.11.9
+      MasterUsername: admin
+      MasterUserPassword: Sommar2020
+      DBInstanceIdentifier: dbinstance
+      VPCSecurityGroups:
+        - !GetAtt MariaDBSEGRP.GroupId
+      PubliclyAccessible: true
+      DBName: wordpressdb
+
+Outputs:
+  # Output endpoint and port information
+  DBEndpoint:
+    Description: 'Database endpoint'
+    Value: !GetAtt MariaDBInstance.Endpoint.Address
+
+  DBPort:
+    Description: 'Database port'
+    Value: !GetAtt MariaDBInstance.Endpoint.Port
+

@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation for WordPress installation on AL2023
+
+Resources:
+  WordPressInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: Uppgift2
+      ImageId: ami-054a53dca63de757b 
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: WordPressServer
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Update and install required packages
+          sudo dnf install -y wget php-mysqlnd httpd php-fpm php-mysqli mariadb105-server php-json php php-devel
+          
+          # Download and extract WordPress
+          wget https://wordpress.org/latest.tar.gz
+          tar -xzf latest.tar.gz
+          rm latest.tar.gz
+          
+          # Start MariaDB and Apache
+          sudo systemctl start mariadb
+          sudo systemctl start httpd
+
+          # Configure database for WordPress
+          sudo mysql -u root -e "CREATE DATABASE wordpress_db;"
+          sudo mysql -u root -e "CREATE USER 'wordpress_user'@'localhost' IDENTIFIED BY 'Sommar2020';"
+          sudo mysql -u root -e "GRANT ALL PRIVILEGES ON wordpress_db.* TO 'wordpress_user'@'localhost';"
+          sudo mysql -u root -e "FLUSH PRIVILEGES;"
+
+          # Copy and configure wp-config.php
+          cp wordpress/wp-config-sample.php wordpress/wp-config.php
+          sed -i 's/database_name_here/wordpress_db/' wordpress/wp-config.php
+          sed -i 's/username_here/wordpress_user/' wordpress/wp-config.php
+          sed -i 's/password_here/Sommar2020/' wordpress/wp-config.php
+
+          # Move WordPress files to Apache document root
+          sudo cp -r wordpress/* /var/www/html/
+
+          # Configure Apache for WordPress permalinks
+          sudo sed -i 's/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
+
+          # Install php-gd for image handling
+          sudo dnf install -y php-gd
+
+          # Set file permissions for Apache
+          sudo chown -R apache /var/www
+          sudo chgrp -R apache /var/www
+          sudo chmod 2775 /var/www
+          find /var/www -type d -exec sudo chmod 2775 {} \;
+          find /var/www -type f -exec sudo chmod 0644 {} \;
+
+          # Enable httpd and mariadb at startup
+          sudo systemctl enable httpd
+          sudo systemctl enable mariadb
+
+          # Installera amazon-efs-utils
+          sudo yum install -y amazon-efs-utils
+          
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP and SSH access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  InstancePublicIP:
+    Description: Public IP address for the WordPress instance
+    Value: !GetAtt WordPressInstance.PublicIp
+  WebsiteURL:
+    Description: URL for the WordPress site
+    Value: !Sub "http://${WordPressInstance.PublicIp}/"
