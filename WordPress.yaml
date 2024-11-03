@@ -42,6 +42,7 @@ Resources:
 
           # Move WordPress files to Apache document root
           sudo cp -r wordpress/* /var/www/html/
+          sudo cp -r wordpress/* /var/www/
 
           # Configure Apache for WordPress permalinks
           sudo sed -i 's/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
