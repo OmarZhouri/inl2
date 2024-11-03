@@ -44,11 +44,11 @@ Resources:
         - IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
-          SourceSecurityGroupId: sg-0361fd15551654b3c  # WP EC2 security group
+          SourceSecurityGroupId: sg-064be8997ec36abcf  # WP EC2 security group
         - IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
-          SourceSecurityGroupId: sg-0978157823f967ccd  # Autoscalling security group
+          SourceSecurityGroupId: sg-07c70466c23d750d0  # Autoscalling security group
   # Mount target in Subnet1
   MountTarget1:
     Type: AWS::EFS::MountTarget
