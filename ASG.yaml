@@ -22,7 +22,7 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
-        ImageId: ami-054a53dca63de757b  # Replace with your preferred AMI
+        ImageId: ami-00385a401487aefa4  # Replace with your preferred AMI
         InstanceType: t2.micro
         KeyName: Uppgift2  # Replace with your KeyPair
         SecurityGroupIds:

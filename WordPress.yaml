@@ -7,7 +7,7 @@ Resources:
     Properties:
       InstanceType: t2.micro
       KeyName: Uppgift2
-      ImageId: ami-054a53dca63de757b 
+      ImageId: ami-00385a401487aefa4 
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
       Tags:
